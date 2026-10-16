@@ -21,8 +21,8 @@ function messageFor(error: { message?: string } | null, fallback: string) {
   if (message.includes('invalid_restock_quantity')) return 'Enter a restock quantity greater than zero.'
   if (message.includes('product_not_found')) return 'That product is not available in this store.'
   if (message.includes('opening_stock_already_recorded')) return 'This product already has stock history. Opening stock can only be recorded once; use restock instead.'
-  if (message.includes('owner_required')) return 'Only the store owner can change inventory.'
-  if (message.includes('permitted_authentication_required')) return 'Sign in again with your authenticator or email code before changing stock.'
+  if (message.includes('owner_required')) return 'Only the store owner can make this change.'
+  if (message.includes('permitted_authentication_required')) return 'Sign in again with your authenticator or email code before making store changes.'
   return fallback
 }
 

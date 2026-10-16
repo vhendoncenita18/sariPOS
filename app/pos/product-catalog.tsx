@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from 'react'
 import { createProduct, type ActionState } from '@/app/actions/owner'
+import { ProductActions } from '@/app/pos/products/product-actions'
 
 export type CatalogProduct = {
   id: string
@@ -109,7 +110,7 @@ export function ProductCatalog({ products, isOwner, detailsAvailable }: {
                     {product.is_active === true ? 'Active' : product.is_active === false ? 'Inactive' : 'Unknown'}
                   </span>
                 </td>
-                {isOwner ? <td className="px-4 py-3.5"><span className="text-xs text-[#89928D]">Edit not available</span></td> : null}
+                {isOwner ? <td className="px-4 py-3.5 align-top"><ProductActions product={product} /></td> : null}
               </tr>
             ))}
             {filteredProducts.length === 0 ? (

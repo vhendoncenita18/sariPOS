@@ -55,17 +55,14 @@ The current MVP defines owner and cashier access and assumes one owner and one a
 
 **Verify:** the actual profile trigger, `create_store_for_current_user` function behavior, membership constraints, and device-registration/revocation flow.
 
-## 4. Product and Inventory Operations Not Fully Defined
+## 4. Product and Inventory Operations
 
 Product creation now uses the trusted owner RPC confirmed deployed by the user. The repository includes owner-only opening-stock and restock RPCs and Inventory forms; migrations `202610160003_record_opening_stock.sql` and `202610160004_record_restock.sql` must be applied to the hosted database. Both functions write an actor-attributed `store_audit_logs` event in the same transaction as the movement. The user-reported event constraint and member-read policy fit the operation; verify RLS force status and hosted function execution. Adjustment and damaged-stock mutations remain unavailable.
 
-For each operation, define its input, authorization, database writes, audit event, and failure behavior:
+Product editing and reversible deactivation/reactivation are implemented locally through owner-only RPCs and catalog controls. Apply migration `202610160005_manage_products.sql` before use. The user-provided hosted `sync_sale` definition locks product rows and rejects inactive or cross-store products before writing sales. Permanent product deletion is unsupported so sales and inventory history remain intact.
 
-- Create product.
-- Edit product name, barcode/SKU, selling price, and optional cost price.
-- Deactivate/reactivate product.
-- Record opening stock.
-- Record restock.
+Remaining operation contracts to define include:
+
 - Record positive or negative adjustment with a required reason.
 - Mark stock damaged or spoiled.
 - View current stock and movement history.

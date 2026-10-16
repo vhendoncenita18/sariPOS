@@ -107,7 +107,7 @@ Do not test unfinished transaction logic against production sales.
 ## Core MVP Acceptance Criteria
 
 - The store creator receives the `owner` role in `user_store_members`; owner access remains subject to store scoping, RLS, grants, and trusted-operation checks. Cashiers cannot access owner-only cost/profit data.
-- Owners can create products, record one initial opening-stock movement for a product with no stock history, restock products, open a shift on an active registered selling device, and assign a verified existing user a store role. `role_permissions` are enforced by server/database operations. Opening stock uses `record_opening_stock`; restock uses `record_restock`. Their migrations must be applied to the hosted database before the UI is usable.
+- Owners can create and edit products, deactivate/reactivate products without deleting history, record one initial opening-stock movement for a product with no stock history, restock products, open a shift on an active registered selling device, and assign a verified existing user a store role. These actions use trusted owner-only database operations. Apply the corresponding migrations before using the UI. Hosted `sync_sale` locks products and rejects inactive or cross-store products.
 - Product and inventory workflows preserve non-negative stock.
 - Valid sale records correct item/overall discounts and totals; insufficient stock and invalid discounts fail.
 - A sale commit atomically produces one sale, its items, one payment, and matching inventory movements; retry produces no duplicate.

@@ -11,7 +11,7 @@ export default async function ProductsPage() {
   const [result, stockResult] = await Promise.all([
     isOwner
       ? supabase.from('products').select(ownerProductColumns).eq('store_id', storeId).order('name')
-      : supabase.from('products').select(basicProductColumns).eq('store_id', storeId).order('name'),
+      : supabase.from('products').select(basicProductColumns).eq('store_id', storeId).eq('is_active', true).order('name'),
     isOwner || permissions.includes('inventory.view')
       ? supabase.rpc('get_store_inventory')
       : Promise.resolve({ data: null, error: null }),

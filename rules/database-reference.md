@@ -175,22 +175,26 @@ Do not assume every operation below already has a function.
 |---|---|---|
 | Create store | Authenticated caller; create store and owner membership atomically | Function exists; inspect body |
 | Register/revoke device | Owner/authorized role; store scope; revocation | Table exists; write path needs verification |
-| Create/edit/deactivate product | Membership/permission; valid price; SKU/barcode uniqueness; store scope | Local migration proposes owner-only create RPC; edit/deactivate and hosted deployment remain unverified |
+| Create/edit/deactivate product | Owner and permitted-auth checks; valid price; SKU/barcode uniqueness; store scope; audit | Local migration `202610160005_manage_products.sql` adds owner-only edit and reversible active-status RPCs; hosted deployment remains pending |
 | Opening stock | Owner and permitted-auth checks; positive quantity; same-store product row lock; one-time initial movement; actor-attributed audit event | Local `record_opening_stock` migration added; hosted deployment and audit policy/constraint verification pending |
 | Restock/adjustment/damage | Validate quantity/reason; lock product; prevent negative stock; append ledger; audit | Write path not confirmed here |
 | Open/close shift | Authorized store/device; enforce one open shift; calculate cash values on trusted side | Local migration proposes shift-open RPC; close path and hosted deployment remain unverified |
 | Record expense | Correct shift/store; amount/reason; audit and cash treatment | Write path needs verification |
-| Sync sale | Auth, membership, device, open shift, item/total/payment validation, stock lock, atomic inserts | Function exists; inspect current body |
+| Sync sale | Auth, membership, device, open shift, item/total/payment validation, stock lock, atomic inserts | User-provided hosted definition inspected; locks product rows and rejects inactive/cross-store products; verify other policies and grants |
 | Refund/void/reversal | Controlled, auditable compensating records and ledger entries | Future scope; do not implement in MVP |
 | Read reports | Enforce store membership and store-scoped queries | Verify policy and query paths |
 
 The local owner/role migration proposes `create_product_for_current_store`,
 `open_store_shift`, role-management RPCs, and an inventory aggregation RPC.
 Review their definitions and test them after applying the migration. In
-particular, the new product RPC does not implement edit/deactivate and the new
-shift RPC requires a pre-registered active device. Product creation and its
-auth helper were later confirmed deployed by the user; verify other functions
-against the target project.
+The new product-management migration adds `update_product_for_current_store`
+and `set_product_active_for_current_store`; it deactivates products rather
+than deleting rows, preserving sale and inventory history. The hosted
+`sync_sale` definition supplied by the user locks product rows and rejects
+inactive or cross-store products before inserting sales. The shift RPC
+requires a pre-registered active device. Product creation and its auth helper
+were previously confirmed deployed by the user; verify new functions against
+the target project.
 
 Migration `202610160003_record_opening_stock.sql` adds the owner-only
 `record_opening_stock(uuid, numeric)` operation. It records a positive

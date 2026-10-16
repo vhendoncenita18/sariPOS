@@ -157,9 +157,12 @@ The MVP allows one active selling device per store.
 
 ### Step 6 --- Initialize products and stock
 
-The owner adds products and records opening stock through the inventory
-workflow. A product should not be sellable if it is inactive or has
-insufficient stock.
+The owner adds products, records opening stock, and manages catalog details
+through the product and inventory workflows. Owners can edit product fields
+and deactivate/reactivate products through trusted operations. Deactivation
+preserves sale and inventory history. A product cannot be sold if inactive or
+if stock is insufficient; the verified hosted `sync_sale` locks products and
+checks both conditions before inserting the sale.
 
 ### Step 7 --- Open the first shift
 

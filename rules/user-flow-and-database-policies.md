@@ -334,10 +334,17 @@ For edit/deactivate, the backend must ensure the product belongs to the
 current store. A product from another store must not be editable by
 changing its UUID in the request.
 
-**Current-policy checkpoint:** Since direct business-table writes were
-intentionally blocked, the product-create/edit API or database function
-must be created/verified before these buttons can work. Do not bypass
-RLS by placing a service-role key in the browser.
+Product management uses owner-only trusted RPCs. Editing validates the
+product fields and SKU/barcode uniqueness; status changes set `is_active`
+and append an actor-attributed audit event. Deactivation preserves the row
+and all history. The hosted `sync_sale` definition supplied by the user locks
+referenced product rows and rejects inactive or cross-store products before
+writing a sale.
+
+**Current-policy checkpoint:** Direct business-table writes remain blocked.
+Product create/edit/status changes use trusted database functions and server
+actions. Apply migration `202610160005_manage_products.sql` before using the
+new controls. Do not bypass RLS by placing a service-role key in the browser.
 
 ------------------------------------------------------------------------
 
@@ -638,9 +645,10 @@ Supabase project.
 -   [ ] Verify `create_store_for_current_user` creates the correct store
     and membership records atomically.
 -   [ ] Define and test the device-registration operation.
--   [ ] Define trusted create/edit/deactivate product operations.
--   [ ] Define trusted opening-stock, restock, and adjustment
-    operations.
+-   [ ] Apply and verify trusted product create/edit/status operations and
+    their audit behavior in the hosted database.
+-   [ ] Apply and verify opening-stock and restock operations; define and
+    test trusted adjustment behavior.
 -   [ ] Define trusted open-shift and close-shift operations.
 -   [ ] Correct and test sale discount validation.
 -   [ ] Strengthen idempotent retry checks to validate related records.

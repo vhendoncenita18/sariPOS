@@ -91,11 +91,9 @@ export default async function PosDashboardPage() {
   const displayName = userName || user.email?.split('@')[0] || roleLabel
 
   const [productsResult, stockResult, salesFirstPage] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, name')
-      .eq('store_id', membership.store_id)
-      .order('name'),
+    isOwner
+      ? supabase.from('products').select('id, name').eq('store_id', membership.store_id).order('name')
+      : supabase.from('products').select('id, name').eq('store_id', membership.store_id).eq('is_active', true).order('name'),
     isOwner || permissions.includes('inventory.view')
       ? supabase.rpc('get_store_inventory')
       : Promise.resolve({ data: null, error: null }),
