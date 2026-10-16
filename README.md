@@ -1,5 +1,11 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## SariPOS project references
+
+- Read [AGENTS.md](AGENTS.md) for repository instructions.
+- Read [rules/database-reference.md](rules/database-reference.md) before any database-backed code or documentation change. It is a working reference; verify uncertain schema, policy, and function details against live SQL.
+- The owner/role SQL migration in `supabase/migrations/` is not deployed until applied to the target Supabase project.
+
 ## Getting Started
 
 First, run the development server:
