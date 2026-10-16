@@ -12,7 +12,9 @@ This is the target product behavior, not a claim that every workflow exists toda
 
 - **Store owner:** The user who creates the store receives the `owner` role in a `public.user_store_members` membership linking their account to that store. The owner can access that store's authorized management features, subject to RLS, database grants, and trusted-operation checks.
 - **Store roles:** Owners can assign verified existing accounts store-defined roles. Role permissions are checked by trusted operations; a navigation item or hidden control does not grant access. The built-in Cashier role is scoped to approved selling/session permissions and never grants product-cost access.
+- Store membership's legacy `role` discriminator remains `cashier` for all non-owner assignments; `role_id` identifies the selected built-in or custom role. Do not store role display names in the constrained discriminator.
 - **Cashier:** Uses checkout, product search, and personal shift/session views. Cannot change baseline costs or view gross profit.
+- A cashier may read, record cash activity for, and close only a shift they opened. Store owners may manage and inspect all shifts. Database policies and trusted operations enforce this boundary; page visibility is not the authorization control.
 - Every business record belongs to a store and must be authorized against the signed-in user's store membership.
 - MVP scope is one store owner and one active selling device per store; do not build multi-store or simultaneous multi-device selling into this release.
 
@@ -56,10 +58,13 @@ This is the target product behavior, not a claim that every workflow exists toda
 
 - A shift belongs to the store and registered device; associate each sale with its active shift.
 - Allow only one open shift per store under MVP assumptions.
-- Opening a shift records the opening cash float. Closing uses a blind-drop flow: the owner enters counted cash before expected cash is revealed.
-- On submission, calculate and preserve expected cash and variance. Flag a non-zero variance but do not block closure for that reason alone.
-- Define expected cash from opening float, net cash sales (including change), and cash expenses only if expenses are included. The exact formula is unresolved and must be agreed before implementing shift close.
-- Shift expenses are planned only if included in the MVP build; do not treat them as required until explicitly committed.
+- Opening a shift records its cash float, store, device, and opening user. Closing uses a blind-drop flow: an authorized shift operator submits counted cash before expected cash is revealed.
+- Calculate and preserve expected cash and variance on the trusted server. Flag a non-zero variance but do not block closure for that reason alone. Variance is `counted_cash - expected_cash`.
+- Expected cash is `opening_float + eligible cash sales - cash refunds - cash drops/withdrawals - cash expenses`. Eligible sales are completed, recorded cash payments, using `payments.amount` (net drawer amount after change); non-cash, void, and unpaid sales are excluded. A cash refund counts only when its refund method is explicitly recorded as cash.
+- Record expenses with a payment method and record cash drops/withdrawals as auditable shift cash movements. Only cash-paid expenses reduce expected cash. Do not infer unknown legacy expense/refund methods; keep close unresolved until an owner classifies them.
+- A closed shift is immutable through ordinary UI. Trusted close logic locks the shift row, prevents duplicate finalization, records actor and audit details, and serializes against sale synchronization.
+- Shift history is store-scoped and shows completed reconciliation and cash-movement details. An incomplete legacy close must be labeled unresolved, not shown as zero.
+- Shift closing currently requires an online trusted call. Do not present an offline close as finalized; offline queued closing remains unimplemented until durable local authorization and synchronization support is built.
 
 ## Authentication and Offline Unlock
 

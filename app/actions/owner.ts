@@ -8,8 +8,18 @@ export type ActionState = { message: string; error: boolean }
 function messageFor(error: { message?: string } | null, fallback: string) {
   const message = error?.message ?? ''
   if (message.includes('role_name_exists')) return 'A role with that name already exists.'
-  if (message.includes('verified_user_not_found')) return 'No verified SariPOS account uses that email yet.'
   if (message.includes('shift_already_open')) return 'A shift is already open for this store.'
+  if (message.includes('shift_already_closed')) return 'This shift has already been closed.'
+  if (message.includes('open_shift_required')) return 'This action requires an open shift.'
+  if (message.includes('shift_session_owner_or_owner_required')) return 'Only the shift opener or store owner can record cash activity or close this shift.'
+  if (message.includes('shift_not_found')) return 'That shift is not available in this store.'
+  if (message.includes('invalid_counted_cash')) return 'Enter a counted cash amount of zero or more.'
+  if (message.includes('invalid_shift_cash_movement')) return 'Enter a valid cash movement, amount, and reason.'
+  if (message.includes('invalid_shift_expense')) return 'Enter a valid expense, payment method, and description.'
+  if (message.includes('shift_cash_movement_idempotency_conflict')) return 'This cash movement request was already used for different details. Refresh and submit again.'
+  if (message.includes('shift_expense_idempotency_conflict')) return 'This expense request was already used for different details. Refresh and submit again.'
+  if (message.includes('shift_expense_payment_method_unverified')) return 'A previous expense has no verified payment method. Ask the owner to classify it before closing.'
+  if (message.includes('refund_method_unverified')) return 'A previous refund has no verified refund method. Ask the owner to classify it before closing.'
   if (message.includes('active_device_required')) return 'Choose an active registered selling device.'
   if (message.includes('invalid_selling_price')) return 'Enter a selling price greater than zero.'
   if (message.includes('invalid_cost_price')) return 'Cost price cannot be negative.'
@@ -23,6 +33,9 @@ function messageFor(error: { message?: string } | null, fallback: string) {
   if (message.includes('opening_stock_already_recorded')) return 'This product already has stock history. Opening stock can only be recorded once; use restock instead.'
   if (message.includes('owner_required')) return 'Only the store owner can make this change.'
   if (message.includes('permitted_authentication_required')) return 'Sign in again with your authenticator or email code before making store changes.'
+  if (message.includes('invalid_role')) return 'That role is not available for your store. Refresh Store Settings and choose a listed role.'
+  if (message.includes('cannot_change_owner_role')) return 'The store owner role cannot be reassigned.'
+  if (message.includes('verified_user_not_found')) return 'No confirmed SariPOS account uses that email. Confirm the account email and try again.'
   return fallback
 }
 
@@ -187,7 +200,7 @@ export async function assignStoreRole(_previous: ActionState, formData: FormData
   const roleId = String(formData.get('roleId') ?? '')
   if (!email || !roleId) return { message: 'Enter a verified user email and select a role.', error: true }
   const { error } = await context.supabase.rpc('assign_store_role', { p_email: email, p_role_id: roleId })
-  if (error) return { message: messageFor(error, 'Role could not be assigned. Apply the owner operations database migration and try again.'), error: true }
+  if (error) return { message: messageFor(error, 'Role assignment failed for an unrecognized database reason. Check the Supabase Auth/Postgres logs for the assign_store_role request.'), error: true }
   revalidatePath('/pos/settings')
   return { message: 'Store role assigned.', error: false }
 }
@@ -202,4 +215,81 @@ export async function openShift(_previous: ActionState, formData: FormData): Pro
   revalidatePath('/pos/session')
   revalidatePath('/pos')
   return { message: 'Shift opened.', error: false }
+}
+
+export async function closeShift(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const context = await getStoreContext()
+  const shiftId = String(formData.get('shiftId') ?? '')
+  const countedCashRaw = String(formData.get('countedCash') ?? '').trim()
+  const countedCash = Number(countedCashRaw)
+  if (!shiftId || !countedCashRaw || !Number.isFinite(countedCash) || countedCash < 0) {
+    return { message: 'Enter the physical cash count as zero or more.', error: true }
+  }
+
+  const { data, error } = await context.supabase.rpc('close_store_shift', {
+    p_shift_id: shiftId,
+    p_counted_cash: countedCash,
+  })
+  if (error) return { message: messageFor(error, 'Shift could not be closed. Refresh and check the shift status before retrying.'), error: true }
+
+  const result = data as { expected_cash?: number | string; variance?: number | string } | null
+  const money = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' })
+  const expected = Number(result?.expected_cash)
+  const variance = Number(result?.variance)
+  revalidatePath('/pos/session')
+  revalidatePath('/pos/session/history')
+  return {
+    message: Number.isFinite(expected) && Number.isFinite(variance)
+      ? `Shift closed. Expected cash: ${money.format(expected)}. Variance: ${money.format(variance)}.`
+      : 'Shift close confirmed.',
+    error: false,
+  }
+}
+
+export async function recordShiftCashMovementAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const context = await getStoreContext()
+  const shiftId = String(formData.get('shiftId') ?? '')
+  const movementType = String(formData.get('movementType') ?? '')
+  const amount = Number(formData.get('amount'))
+  const reason = String(formData.get('reason') ?? '').trim()
+  const requestId = String(formData.get('requestId') ?? '')
+  if (!shiftId || !requestId || !['cash_drop', 'withdrawal'].includes(movementType) || !Number.isFinite(amount) || amount <= 0 || !reason) {
+    return { message: 'Enter a cash movement type, positive amount, and reason.', error: true }
+  }
+
+  const { error } = await context.supabase.rpc('record_shift_cash_movement', {
+    p_shift_id: shiftId,
+    p_movement_type: movementType,
+    p_amount: amount,
+    p_reason: reason,
+    p_request_id: requestId,
+  })
+  if (error) return { message: messageFor(error, 'Cash movement could not be recorded.'), error: true }
+  revalidatePath('/pos/session')
+  revalidatePath('/pos/session/history')
+  return { message: movementType === 'cash_drop' ? 'Cash drop recorded.' : 'Cash withdrawal recorded.', error: false }
+}
+
+export async function recordShiftExpenseAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const context = await getStoreContext()
+  const shiftId = String(formData.get('shiftId') ?? '')
+  const amount = Number(formData.get('amount'))
+  const description = String(formData.get('description') ?? '').trim()
+  const paymentMethod = String(formData.get('paymentMethod') ?? '')
+  const requestId = String(formData.get('requestId') ?? '')
+  if (!shiftId || !requestId || !Number.isFinite(amount) || amount <= 0 || !description || !['cash', 'gcash', 'maya'].includes(paymentMethod)) {
+    return { message: 'Enter a positive expense amount, description, and payment method.', error: true }
+  }
+
+  const { error } = await context.supabase.rpc('record_shift_expense', {
+    p_shift_id: shiftId,
+    p_amount: amount,
+    p_description: description,
+    p_payment_method: paymentMethod,
+    p_request_id: requestId,
+  })
+  if (error) return { message: messageFor(error, 'Shift expense could not be recorded.'), error: true }
+  revalidatePath('/pos/session')
+  revalidatePath('/pos/session/history')
+  return { message: 'Shift expense recorded.', error: false }
 }

@@ -65,8 +65,8 @@ export function ConfirmedForm({ action, title, description, confirmLabel, destru
           <h2 id={titleId} className="mt-4 text-lg font-semibold">{title}</h2>
           <p id={descriptionId} className="mt-2 text-sm leading-6 text-[#687873]">{description}</p>
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" onClick={() => { setOpen(false); formRef.current = null }} className="min-h-11 rounded-lg border border-[#DCE5E1] px-4 text-sm font-medium hover:bg-[#F7F8F7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#16835D]/20">Go back</button>
-            <button type="button" onClick={confirm} className={`min-h-11 rounded-lg px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-4 ${destructive ? 'bg-[#9B3028] hover:bg-[#812820] focus-visible:ring-[#B5473D]/20' : 'bg-[#171918] hover:bg-black focus-visible:ring-[#16835D]/20'}`}>{confirmLabel}</button>
+            <button type="button" onClick={() => { setOpen(false); formRef.current = null }} className="min-h-12 cursor-pointer rounded-lg border border-[#DCE5E1] px-4 text-sm font-medium hover:bg-[#F7F8F7] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#16835D]/20">Go back</button>
+            <button type="button" onClick={confirm} className={`min-h-12 cursor-pointer rounded-lg px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-4 ${destructive ? 'bg-[#9B3028] hover:bg-[#812820] focus-visible:ring-[#B5473D]/20' : 'bg-[#171918] hover:bg-black focus-visible:ring-[#16835D]/20'}`}>{confirmLabel}</button>
           </div>
         </div>
       </dialog>

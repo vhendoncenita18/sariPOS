@@ -23,6 +23,15 @@ The maximum time a previously authorized device may use local access after onlin
 **Blind drop**:
 The shift-closing process where counted cash is submitted before the system reveals expected cash.
 
+**Expected cash**:
+The drawer balance calculated from opening float, eligible cash sales, cash refunds, cash drops or withdrawals, and cash-paid expenses.
+
+**Cash reconciliation**:
+The comparison of counted cash with expected cash at shift close. Variance is counted cash minus expected cash.
+
+**Shift cash movement**:
+An auditable removal of money from an open shift's drawer, such as a cash drop or withdrawal.
+
 **Inventory movement**:
 A recorded change to a product's stock, such as opening stock, restock, adjustment, or sale deduction. Current stock is the sum of its movements.
 _Avoid_: Stock edit

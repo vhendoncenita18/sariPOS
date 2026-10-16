@@ -19,6 +19,12 @@ create table if not exists public.role_permissions (
 alter table public.user_store_members
   add column if not exists role_id uuid references public.store_roles(id) on delete set null;
 
+alter table public.user_store_members
+  drop constraint if exists user_store_members_role_check;
+alter table public.user_store_members
+  add constraint user_store_members_role_check
+  check (role = any (array['owner', 'cashier']));
+
 alter table public.store_roles enable row level security;
 alter table public.role_permissions enable row level security;
 revoke all on public.store_roles, public.role_permissions from anon, authenticated;
@@ -267,7 +273,7 @@ begin
   end if;
 
   insert into public.user_store_members (user_id, store_id, role, role_id)
-  values (v_user_id, v_store_id, v_role_name, p_role_id)
+  values (v_user_id, v_store_id, 'cashier', p_role_id)
   on conflict (user_id, store_id) do update set role=excluded.role, role_id=excluded.role_id;
 end;
 $$;

@@ -33,13 +33,13 @@ RLS was previously confirmed enabled for these 13 public tables:
 | `user_store_members` | Links users to stores and records membership/role. Store access must be based on this membership. Store creator is intended to become `owner`; verify the stored role and function body. |
 | `store_devices` | Registered selling devices. `sync_sale` checks `id`, `store_id`, `is_active`, and `revoked_at`. An active row alone is not cryptographic proof of physical-device identity. |
 | `products` | Store-scoped product catalog. Known fields include name, SKU/barcode, `selling_price >= 0`, optional `cost_price >= 0`, `is_active`, timestamps. Known unique `(store_id,id)` and per-store partial unique indexes for SKU/barcode. No stock column; stock is ledger-derived. |
-| `shifts` | Store/device shift and cash reconciliation. Known fields include open/close timestamps, opening float, counted/expected cash, variance, status. Known composite store/device relationship, unique `(store_id,id)`, and partial unique index for one open shift per store. |
+| `shifts` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `device_id`, `opened_at`, `opening_float`, `closed_at`, `counted_cash`, `expected_cash`, `variance`, `status`, and `created_at`. Status is `open` or `closed`; the check requires `closed_at` when closed. Composite store/device and store/id relationships are present. User-reported SELECT policy permits store members. Local migration `202610160006_close_and_reconcile_shifts.sql` adds `opened_by_user_id` and `closed_by_user_id`; deployment remains pending. |
 | `sales` | Sale header: ID, store, shift, status, subtotal, discount amount, grand total, occurred/received timestamps, required `payload_hash`. Known checks: nonnegative totals, `discount_amount <= subtotal`, `grand_total = subtotal - discount_amount`, completed status, store/shift relationship, unique `(store_id,id)`. |
 | `sale_items` | Item snapshots: store, sale, product, product-name snapshot, unit price, quantity, line discount, line total. Known checks: nonnegative price/discount, quantity positive, discount no greater than gross line value, `line_total = unit_price * quantity - line_discount`. |
-| `payments` | One payment per sale. Known methods: `cash`, `gcash`, `maya`; unique sale payment. Cash tender/change are validated for cash; non-cash payments should not have cash-only values. A reference is not proof a wallet transfer was received. |
+| `payments` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `sale_id`, `method`, `amount`, nullable `cash_tendered`, nullable `change_given`, nullable `reference`, `status`, `created_at`. Methods are `cash`, `gcash`, `maya`; status is `recorded`. For cash, `amount` is the net amount retained by the drawer; `cash_tendered - change_given = amount`. |
 | `inventory_movements` | Inventory ledger. Hosted columns confirmed from the project on 2026-10-16: `id`, `store_id`, `product_id`, nullable `sale_id`, nullable `sale_item_id`, `quantity_change`, `reason`, and `created_at`. Stock is `SUM(quantity_change)` by store/product. Known reasons: `opening_stock`, `restock`, `sale`, `adjustment`, `return`, `damage`; `quantity_change <> 0`. Sale movement requires sale and sale-item references and must be negative; non-sale movement has no sale-item reference. Known unique movement per sale item. The confirmed column list has no actor field; trusted stock operations must use `store_audit_logs` for actor attribution. Constraints and policies still require live verification. |
-| `shift_expenses` | Expenses associated with shifts. Exact columns, policies, and trusted write path must be verified. |
-| `sale_reversals` | Table exists for future/controlled reversal workflows. Refunds/voids are outside the initial MVP; do not implement without reviewing the schema and approved workflow. |
+| `shift_expenses` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `shift_id`, `amount`, `description`, and `created_at`; constraints require a positive amount and nonblank description. User-reported SELECT policy permits store members. Local migration `202610160006_close_and_reconcile_shifts.sql` adds `payment_method`, `request_id`, and `actor_user_id`, plus a trusted write RPC. Legacy rows with no payment method block shift close until classified. |
+| `sale_reversals` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `sale_id`, `reversal_type`, `amount`, `reason`, `actor_user_id`, and `created_at`; `reversal_type` is `refund` or `void`, amount is positive, and reason is nonblank. User-reported SELECT policy permits store members. Local migration `202610160006_close_and_reconcile_shifts.sql` adds nullable `refund_method`. Cash refunds are counted only when explicitly marked `cash`; legacy refunds without a method block shift close until classified. |
 | `store_audit_logs` | Audit trail for store actions. Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, nullable `actor_user_id`, `event_type`, `details`, and `created_at`. Reported constraints require referenced store and actor rows to remain, and require a nonblank event type. The reported policy permits authenticated store members to read; it has no direct authenticated insert policy. Trusted writes must use a controlled database function. Other policies, RLS force status, and append-only protections remain to verify. |
 
 The local migration `supabase/migrations/202610160001_owner_roles_and_operations.sql`
@@ -48,10 +48,41 @@ These are repository definitions only until the migration is applied and
 verified in the target Supabase project; do not count them as confirmed live
 tables yet.
 
+Migration `202610160007_fix_role_assignment_membership_key.sql` updates
+`public.assign_store_role` to write the legacy membership discriminator as
+`cashier` while storing the selected built-in/custom role in `role_id`. The
+hosted Postgres log reported that the previous function tried to write the
+display name `Cashier`, violating `user_store_members_role_check`. Apply this
+follow-up migration to the hosted project before retrying role assignment.
+
+The user then inspected the hosted constraint and reported that
+`user_store_members_role_check` allowed only `role = 'owner'`. Migration
+`202610160008_allow_cashier_membership_role.sql` updates it to allow both
+`owner` and `cashier`, matching the role discriminator used by the app. Apply
+this migration after `202610160007` before assigning cashiers.
+
 Local migration `supabase/migrations/202610160004_record_restock.sql` adds
 `public.record_restock(uuid, numeric) RETURNS uuid`, an owner-only trusted
 operation that writes a positive `restock` movement and matching audit event.
 It is not available in the hosted database until applied and verified there.
+
+Local migration `supabase/migrations/202610160006_close_and_reconcile_shifts.sql`
+adds actor fields to shifts, payment-method and idempotency fields to shift
+expenses, refund-method classification to sale reversals, and an audited
+`shift_cash_movements` table for cash drops and withdrawals. Its trusted RPCs
+record expenses/movements and close shifts using the approved formula. Closing
+locks the shift row, serializing against the user-provided hosted `sync_sale`,
+which also locks the matching open shift before committing a sale. Legacy
+refunds/expenses with unknown payment methods are not inferred; close refuses
+to finalize until they are classified. This migration and its policies remain
+local until applied and verified in the target project.
+
+Migration `202610160009_scope_cashier_shift_access.sql` restricts shift,
+expense, cash-movement, and audit-log reads to owners or a member's own shifts
+and actions. Cash movements, expenses, and shift closing are restricted to
+the shift opener or an owner, with actor identity checked in database
+triggers. The shift-breakdown RPC enforces the same own-shift rule. Apply it
+after migration 006 and verify hosted policies and grants before use.
 
 Supabase Auth owns `auth.users`. Do not insert directly into `auth.users`; use supported Supabase Auth flows.
 
@@ -155,7 +186,7 @@ The trusted operation must validate items and recompute totals; do not trust tot
 - Sale sync requires a matching open shift and active registered device.
 - One open shift per store is intended and backed by a partial unique index.
 - Blind-drop closing means counted cash is entered before expected cash is revealed.
-- Verify the actual expected-cash formula and trusted shift open/close operations before implementation.
+- Use the approved expected-cash formula above; verify local migration `202610160006_close_and_reconcile_shifts.sql` against a test project before hosted use.
 
 ### Offline sync and idempotency
 
@@ -178,8 +209,8 @@ Do not assume every operation below already has a function.
 | Create/edit/deactivate product | Owner and permitted-auth checks; valid price; SKU/barcode uniqueness; store scope; audit | Local migration `202610160005_manage_products.sql` adds owner-only edit and reversible active-status RPCs; hosted deployment remains pending |
 | Opening stock | Owner and permitted-auth checks; positive quantity; same-store product row lock; one-time initial movement; actor-attributed audit event | Local `record_opening_stock` migration added; hosted deployment and audit policy/constraint verification pending |
 | Restock/adjustment/damage | Validate quantity/reason; lock product; prevent negative stock; append ledger; audit | Write path not confirmed here |
-| Open/close shift | Authorized store/device; enforce one open shift; calculate cash values on trusted side | Local migration proposes shift-open RPC; close path and hosted deployment remain unverified |
-| Record expense | Correct shift/store; amount/reason; audit and cash treatment | Write path needs verification |
+| Open/close shift | Authorized store/device; serialize sale sync; calculate cash values on trusted side; preserve actor and audit | Migration `202610160006_close_and_reconcile_shifts.sql` adds trusted close and actor fields; hosted deployment and RLS/function-owner behavior remain unverified |
+| Record expense/cash movement | Open shift, store scope, positive amount, method/type, reason, actor, idempotent request, audit | Migration `202610160006_close_and_reconcile_shifts.sql` adds trusted write RPCs and a cash movement ledger; hosted deployment remains pending |
 | Sync sale | Auth, membership, device, open shift, item/total/payment validation, stock lock, atomic inserts | User-provided hosted definition inspected; locks product rows and rejects inactive/cross-store products; verify other policies and grants |
 | Refund/void/reversal | Controlled, auditable compensating records and ledger entries | Future scope; do not implement in MVP |
 | Read reports | Enforce store membership and store-scoped queries | Verify policy and query paths |

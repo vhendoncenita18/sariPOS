@@ -11,6 +11,7 @@ type NavigationItem = {
 
 const ownerItems: NavigationItem[] = [
   { href: '/pos', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/pos/sale', label: 'New sale', icon: 'sales' },
   { href: '/pos/sales', label: 'Sales', icon: 'sales' },
   { href: '/pos/inventory', label: 'Inventory', icon: 'inventory' },
   { href: '/pos/products', label: 'Products', icon: 'products' },
@@ -20,6 +21,7 @@ const ownerItems: NavigationItem[] = [
 
 const cashierItems: NavigationItem[] = [
   { href: '/pos', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/pos/sale', label: 'New sale', icon: 'sales' },
   { href: '/pos/products', label: 'Products', icon: 'products' },
   { href: '/pos/session', label: 'My session', icon: 'session' },
 ]
@@ -46,6 +48,7 @@ function NavigationIcon({ name }: { name: NavigationItem['icon'] }) {
 export function PosNavigation({ isOwner, permissions, mobile = false }: { isOwner: boolean; permissions: string[]; mobile?: boolean }) {
   const pathname = usePathname()
   const permissionsForRoute: Record<string, string[]> = {
+    '/pos/sale': ['sales.create'],
     '/pos/products': ['products.view'],
     '/pos/inventory': ['inventory.view'],
     '/pos/session': ['own_session.view', 'shift.open'],
@@ -58,7 +61,7 @@ export function PosNavigation({ isOwner, permissions, mobile = false }: { isOwne
   return (
     <nav aria-label={mobile ? 'Workspace navigation' : 'Main navigation'} className={mobile ? 'flex gap-1 overflow-x-auto border-b border-[#E8EAE8] bg-white px-3 py-2 md:hidden' : 'mt-8 space-y-1'}>
       {items.map((item) => {
-        const current = pathname === item.href
+        const current = pathname === item.href || (item.href === '/pos/session' && pathname.startsWith('/pos/session/'))
         return (
           <Link
             key={item.href}

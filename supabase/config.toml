@@ -1,0 +1,29 @@
+[auth.email]
+otp_expiry = 600
+
+[auth.email.template.magic_link]
+subject = "Your SariPOS sign-in code"
+content_path = "./templates/auth/magic-link.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your SariPOS account"
+content_path = "./templates/auth/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Your SariPOS password reset code"
+content_path = "./templates/auth/recovery.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your SariPOS password was changed"
+content_path = "./templates/auth/password-changed-notification.html"
+
+[auth.email.notification.mfa_factor_enrolled]
+enabled = true
+subject = "A verification method was added to your SariPOS account"
+content_path = "./templates/auth/mfa-factor-enrolled-notification.html"
+
+[auth.email.notification.mfa_factor_unenrolled]
+enabled = true
+subject = "A verification method was removed from your SariPOS account"
+content_path = "./templates/auth/mfa-factor-unenrolled-notification.html"

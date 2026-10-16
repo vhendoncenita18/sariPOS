@@ -427,25 +427,14 @@ sign and authorization rules.
 
 SariPOS uses a blind-drop closing process.
 
-1.  The owner opens the active shift's **Close Shift** screen.
-2.  The owner counts physical cash.
-3.  The owner enters counted cash before the expected cash amount is
-    revealed.
-4.  The system calculates expected cash using the configured cash-flow
-    rules.
-5.  The system calculates the variance between counted and expected
-    cash.
-6.  The shift is marked closed and the values are recorded.
-7.  A non-zero variance is flagged for review but does not automatically
-    block closing.
-8.  The owner can inspect the shift history and its reconciliation
-    details.
+1.  An authorized shift operator opens the active shift's **Close Shift** screen.
+2.  The operator counts physical cash and submits the count without seeing expected cash.
+3.  The trusted server locks the shift row, waits for any in-flight sale sync to finish, and calculates expected cash from committed records: opening float + completed recorded cash payments (`payments.amount`) − cash refunds − cash drops/withdrawals − cash-paid expenses.
+4.  The server saves counted cash, expected cash, variance (`counted_cash - expected_cash`), closing user/time, and an audit event in one transaction. A non-zero variance does not block closing and never changes expected cash.
+5.  Retrying the same close from the same user with the same count returns the saved reconciliation; a different count or user cannot change a closed shift.
+6.  The operator can inspect store-scoped shift history and a breakdown of cash movements and expenses.
 
-The expected-cash calculation must be based on clearly defined treatment
-of opening float, net cash sales (including change), and cash expenses
-only if expenses enter MVP. Refunds are outside MVP and must not be
-assumed. The exact expected-cash formula remains unresolved; agree it
-before implementing shift close.
+Closing requires an online trusted call. The current app has no durable offline close or sales queue, so it must not show an offline count as finalized. Unknown legacy refund/expense payment methods block close until classified from authoritative records.
 
 ------------------------------------------------------------------------
 

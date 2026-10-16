@@ -33,7 +33,7 @@ SariPOS is an offline-first POS for a Philippine sari-sari store. MVP assumes on
 
 - One payment record per sale; cash stores tender/change. GCash and Maya are recorded methods, not integrated wallet transfers.
 - Open a shift with a cash float, associate sales, and close via blind drop. Reveal expected cash only after counted cash is submitted; record and flag variance without blocking closure solely due to a non-zero variance.
-- Expenses are conditional scope. Preserve protected records for sensitive actions, including stock adjustments and shift closing.
+- Shift expenses, cash drops, and withdrawals are included in reconciliation and must use trusted, auditable write paths. Preserve protected records for sensitive actions, including stock adjustments and shift closing.
 
 ### Authentication and Device Security
 
@@ -73,7 +73,7 @@ Exact routes must follow the existing App Router and database schema. Checkout/P
 | Settings (`/pos/settings`) | Limited store/application preferences | Required, limited MVP scope |
 | Device & Security | Review authorized device and supported controls | Required for planned device controls |
 | Audit Log | Review protected, important actions | Recommended; access-controlled |
-| Expenses | Record/review shift expenses | Conditional; only if committed to MVP |
+| Expenses | Record/review shift expenses and payment method | Included in shift reconciliation |
 
 Each implemented workspace navigation item opens its own route and page. The current route map is **Dashboard** (`/pos`), **Sales** (`/pos/sales`), **Inventory** (`/pos/inventory`), **Products** (`/pos/products`), **My session** (`/pos/session`, cashier), and **Store settings** (`/pos/settings`, owner). Planned routes without verified implementations must not be shown as working navigation links. Auth and offline-unlock screens stay outside the workspace shell.
 
@@ -112,8 +112,8 @@ Do not test unfinished transaction logic against production sales.
 - Valid sale records correct item/overall discounts and totals; insufficient stock and invalid discounts fail.
 - A sale commit atomically produces one sale, its items, one payment, and matching inventory movements; retry produces no duplicate.
 - Offline sales persist and synchronize after reconnection; failures are visible and safely retryable.
-- Shift close preserves counted/expected cash and variance.
-- Expected cash follows an agreed formula for opening float and net cash sales; cash expenses are included only if the expense workflow is committed.
+- Shift close preserves the blind count, trusted expected cash, variance, closer, and audit event. Expected cash is opening float + eligible recorded cash sales − cash refunds − cash drops/withdrawals − cash-paid expenses.
+- Shift history is store-scoped, filterable by dates, closing member, and reconciliation status, with cash movement and expense details. Incomplete legacy reconciliations are labeled unresolved.
 - Service credentials never reach the browser; critical business operations have repeatable tests.
 
 ## Source of Truth and Change Control

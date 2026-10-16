@@ -151,19 +151,13 @@ The server/database must calculate or independently verify totals from the submi
 
 ## 7. Shift Cash Calculation and Expenses
 
-The blind-drop close process is specified, but expected cash needs a precise formula and test cases.
+The expected-cash formula and online close behavior are decided and implemented in local migration `202610160006_close_and_reconcile_shifts.sql` plus the `/pos/session` workflow. Expected cash is opening float + eligible recorded cash sales (`payments.amount`) − explicitly cash-paid refunds − cash drops/withdrawals − cash-paid expenses. Variance is counted cash minus expected cash. The server locks the shift and computes both totals; a mismatch does not prevent closure. Cash movements/expenses are recorded only against an open shift and are auditable/idempotent. Closed shifts are not reopened through ordinary UI.
 
-**Decision needed:** define whether expected cash is:
-`opening_float + completed cash sales − cash refunds (if later supported) − recorded cash expenses`.
-Non-cash GCash/Maya payments must not be included in expected physical cash.
-
-Also define:
-- Whether an expense is permitted only while a shift is open.
-- Whether every expense requires a reason and optional note/receipt reference.
-- Whether a closed shift can ever be reopened (recommended: not through ordinary UI).
-- Whether the server calculates `expected_cash` and `variance` rather than accepting client-supplied values.
-- Whether the blind-drop UI reveals expected cash only after the counted cash is saved successfully.
-- What happens if closing fails because of a network outage. Since shift operations affect trusted server state, do not imply a server-confirmed close while offline unless a separate safe offline protocol is explicitly designed.
+Remaining readiness conditions:
+- Apply migration `202610160006_close_and_reconcile_shifts.sql` to a test Supabase project, verify its constraints, RLS, function owner/search path, and grants, then run concurrency and cross-store authorization checks before hosted use.
+- Classify any existing shift expense or refund with a null payment method from authoritative records before closing that shift. The close RPC rejects ambiguous historical rows rather than guessing.
+- Offline close requests are not queued locally. The page requires an online trusted call, and does not show a locally calculated result as finalized. Add offline close only with durable, account-scoped local persistence and the approved 72-hour device authorization controls.
+- History access uses store membership and store filters; verify the hosted policy and new RPC execution after applying the migration.
 
 ## 8. GCash and Maya Verification
 
@@ -342,7 +336,7 @@ At minimum, this inventory should cover store creation, device registration/revo
 - [ ] Confirm monetary precision and rounding.
 - [ ] Confirm whether fractional item quantities are allowed.
 - [ ] Define rejected offline-sale recovery.
-- [ ] Define the exact expected-cash formula.
+- [x] Define the expected-cash formula: opening float + eligible recorded cash sales − cash refunds − cash drops/withdrawals − cash-paid expenses.
 - [ ] Define GCash/Maya manual verification behavior.
 - [ ] Confirm offline authorization duration and PIN lockout behavior.
 - [ ] Define device replacement and revocation.
