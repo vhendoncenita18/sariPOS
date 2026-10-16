@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useActionState } from 'react'
 import { enrollTotp, verifyTotpEnrollment, type AuthState } from '@/app/actions/auth'
+import { ActionFeedback } from '@/app/components/action-feedback'
 
 export function TotpSetupForm() {
   const [setup, setupAction, setupPending] = useActionState<AuthState, FormData>(enrollTotp, {})
@@ -12,12 +13,10 @@ export function TotpSetupForm() {
     <>
       {!setup.qrCode ? (
         <form action={setupAction} className="mt-6">
-          <p aria-live="polite" className="mb-3 min-h-6 text-sm text-[#B42318]">{setup.error}</p>
           <button disabled={setupPending} className="min-h-12 w-full rounded-lg bg-[#087F5B] px-4 text-sm font-semibold text-white hover:bg-[#066B4D] disabled:opacity-70">{setupPending ? 'Preparing…' : 'Set up authenticator'}</button>
         </form>
       ) : (
         <>
-          <p className="mt-5 text-sm leading-6 text-[#687873]">{setup.message}</p>
           <div className="mt-4 flex justify-center rounded-xl border border-[#E8EAE8] bg-white p-4">
             <Image src={setup.qrCode.trimEnd()} alt="QR code for your SariPOS authenticator" width={220} height={220} unoptimized />
           </div>
@@ -31,11 +30,11 @@ export function TotpSetupForm() {
               <label htmlFor="otp" className="mb-2 block text-sm font-medium">Authenticator code</label>
               <input id="otp" name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" minLength={6} maxLength={6} required placeholder="000000" className="h-12 w-full rounded-lg border border-[#DCE5E1] px-3 text-center font-mono text-lg tracking-[0.3em] outline-none focus:border-[#16835D] focus:ring-4 focus:ring-[#16835D]/10" />
             </div>
-            <p aria-live="polite" className="min-h-8 text-sm leading-5 text-[#B42318]">{verify.error}</p>
             <button disabled={verifyPending} className="min-h-12 w-full rounded-lg bg-[#087F5B] px-4 text-sm font-semibold text-white hover:bg-[#066B4D] disabled:opacity-70">{verifyPending ? 'Verifying…' : 'Verify and enable authenticator'}</button>
           </form>
         </>
       )}
+      <ActionFeedback message={verify.error ?? setup.error ?? setup.message} error={Boolean(verify.error ?? setup.error)} signal={verify.error ? verify : setup} />
       <a href="/mfa/choose" className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-[#087F5B] underline-offset-4 hover:underline">Back to verification choices</a>
     </>
   )

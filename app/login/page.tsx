@@ -1,5 +1,6 @@
 import { signIn, signUp } from '@/app/actions/auth'
 import { AuthForm } from '@/app/login/auth-form'
+import { ActionFeedback } from '@/app/components/action-feedback'
 import { Suspense } from 'react'
 
 type LoginPageProps = {
@@ -28,11 +29,12 @@ async function LoginContent({ searchParams }: LoginPageProps) {
       : callbackError === 'confirmation'
       ? 'That confirmation link is invalid or expired. Request a new confirmation code and try again.'
       : undefined
+  const noticeError = callbackError === 'confirmation'
 
-  return <AuthPageShell isSignUp={isSignUp} notice={notice} />
+  return <AuthPageShell isSignUp={isSignUp} notice={notice} noticeError={noticeError} />
 }
 
-function AuthPageShell({ isSignUp, notice }: { isSignUp: boolean; notice?: string }) {
+function AuthPageShell({ isSignUp, notice, noticeError = false }: { isSignUp: boolean; notice?: string; noticeError?: boolean }) {
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#F4F7F5] px-4 py-10 text-[#17231F] sm:px-6">
       <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-32 size-[420px] rounded-full border border-[#16835D]/10 sm:right-[8%] sm:top-[-220px]" />
@@ -69,7 +71,7 @@ function AuthPageShell({ isSignUp, notice }: { isSignUp: boolean; notice?: strin
           </p>
         </div>
 
-        {notice ? <p role="alert" className="mt-5 rounded-lg border border-[#F0D5D2] bg-[#FFF8F7] p-3 text-sm leading-6 text-[#8B322B]">{notice}</p> : null}
+        <ActionFeedback message={notice} error={noticeError} signal={notice ? { notice } : undefined} />
         <AuthForm action={isSignUp ? signUp : signIn} isSignUp={isSignUp} />
 
         <p className="mt-6 min-h-5 text-center text-sm text-[#687873]">

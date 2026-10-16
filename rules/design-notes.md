@@ -82,9 +82,13 @@ The offline queue and status screens are target design requirements, not impleme
 ## Interaction & Accessibility
 
 - Keep all POS actions at least 48×48 px for touch use.
+- Keep catalog table rows compact and single-line; truncate long names or identifiers with a way to inspect the full value, and vertically align each cell with consistent horizontal padding.
 - Use visible focus rings, semantic labels, logical keyboard order, and accessible names for icon-only controls.
 - Pair color with text or an icon for alerts, selection, and status.
 - Keep loading and validation regions dimensionally stable to prevent layout shifts.
+- Use an in-app confirmation dialog before consequential writes such as creating or editing products, recording inventory, assigning roles, creating a store, or opening a shift. State the effect plainly and name the action on the confirm button; keep cancel available and make destructive changes visually distinct.
+- Show mutation success and errors in a shared, dismissible toast card pinned to the top right, with live announcements. Keep informational page-state explanations in context. Do not use browser alerts or confirmations, and do not add confirmation steps to routine sign-in or one-time-code entry.
+- Enabled buttons, selects, inputs, textareas, and button-like controls use a pointer cursor; disabled buttons, inputs, selects, and textareas communicate their unavailable state and use a not-allowed cursor.
 - Respect reduced-motion preferences. Motion should explain a user action, not decorate the dashboard.
 - Maintain readable contrast across white surfaces and do not depend on hover to reveal prices or actions.
 - For authentication, expose form errors through a persistent live region, disable repeat submission while pending, and preserve enough reserved space to avoid content jumps.

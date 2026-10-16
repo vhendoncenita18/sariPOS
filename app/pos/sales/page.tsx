@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getStoreContext } from '@/app/pos/store-context'
 
@@ -22,7 +23,15 @@ function formatDate(value: string | null | undefined) {
     : new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
-export default async function SalesPage() {
+export default function SalesPage() {
+  return (
+    <Suspense fallback={<SalesLoading />}>
+      <SalesContent />
+    </Suspense>
+  )
+}
+
+async function SalesContent() {
   const { supabase, storeId, isOwner } = await getStoreContext()
   if (!isOwner) redirect('/pos')
 
@@ -87,6 +96,21 @@ export default async function SalesPage() {
       )}
 
       <p className="mt-4 text-xs leading-5 text-[#89928D]">Payment details, sale items, and receipts require the related schema and detail route to be verified.</p>
+    </main>
+  )
+}
+
+function SalesLoading() {
+  return (
+    <main aria-busy="true" aria-label="Loading sales" className="mx-auto max-w-[1560px] px-4 py-7 sm:px-7 lg:px-9">
+      <div aria-hidden="true" className="h-7 w-32 animate-pulse rounded bg-[#E8EAE8]" />
+      <div aria-hidden="true" className="mt-3 h-4 w-64 max-w-full animate-pulse rounded bg-[#E8EAE8]" />
+      <div aria-hidden="true" className="mt-8 overflow-hidden rounded-xl border border-[#E7EBE8] bg-white">
+        <div className="h-11 animate-pulse bg-[#F7F8F7]" />
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="h-12 animate-pulse border-t border-[#EEF1EF]" />
+        ))}
+      </div>
     </main>
   )
 }

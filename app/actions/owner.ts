@@ -26,6 +26,11 @@ function messageFor(error: { message?: string } | null, fallback: string) {
   return fallback
 }
 
+function capitalizeFirstLetter(value: string) {
+  const [first, ...rest] = value.trim()
+  return first ? `${first.toUpperCase()}${rest.join('')}` : ''
+}
+
 async function ownerContext() {
   const context = await getStoreContext()
   return context.isOwner ? context : null
@@ -35,7 +40,7 @@ export async function createProduct(_previous: ActionState, formData: FormData):
   const context = await ownerContext()
   if (!context) return { message: 'Only the store owner can add products.', error: true }
 
-  const name = String(formData.get('name') ?? '').trim()
+  const name = capitalizeFirstLetter(String(formData.get('name') ?? ''))
   const sellingPrice = Number(formData.get('sellingPrice'))
   const costRaw = String(formData.get('costPrice') ?? '').trim()
   const costPrice = costRaw ? Number(costRaw) : null
@@ -66,7 +71,7 @@ export async function updateProduct(_previous: ActionState, formData: FormData):
   if (!context) return { message: 'Only the store owner can edit products.', error: true }
 
   const productId = String(formData.get('productId') ?? '')
-  const name = String(formData.get('name') ?? '').trim()
+  const name = capitalizeFirstLetter(String(formData.get('name') ?? ''))
   const sku = String(formData.get('sku') ?? '').trim() || null
   const barcode = String(formData.get('barcode') ?? '').trim() || null
   const sellingPrice = Number(formData.get('sellingPrice'))

@@ -2,6 +2,8 @@
 
 import { useActionState } from 'react'
 import { recordRestock, type ActionState } from '@/app/actions/owner'
+import { ConfirmedForm } from '@/app/components/confirmed-form'
+import { ActionFeedback } from '@/app/components/action-feedback'
 
 type RestockProduct = {
   id: string
@@ -20,7 +22,7 @@ export function RestockForm({ products }: { products: RestockProduct[] }) {
       </div>
 
       {products.length > 0 ? (
-        <form action={action} className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,0.55fr)_auto] sm:items-end">
+        <ConfirmedForm action={action} title="Record this restock?" description="The received quantity will be added to the product’s inventory history." confirmLabel="Record restock" className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,0.55fr)_auto] sm:items-end">
           <label className="text-sm font-medium">
             Product
             <select required name="productId" defaultValue="" className="mt-1.5 min-h-12 w-full rounded-lg border border-[#DCE5E1] bg-white px-3 font-normal outline-none focus:border-[#16835D] focus:ring-4 focus:ring-[#16835D]/10">
@@ -39,8 +41,8 @@ export function RestockForm({ products }: { products: RestockProduct[] }) {
           <button disabled={pending} className="min-h-12 rounded-lg bg-[#171918] px-5 text-sm font-semibold text-white hover:bg-black focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#16835D]/20 disabled:cursor-wait disabled:opacity-60">
             {pending ? 'Recording…' : 'Record restock'}
           </button>
-          {state.message ? <p role={state.error ? 'alert' : 'status'} className={`text-sm sm:col-span-3 ${state.error ? 'text-[#9B3028]' : 'text-[#087F5B]'}`}>{state.message}</p> : null}
-        </form>
+          <ActionFeedback message={state.message} error={state.error} signal={state} />
+        </ConfirmedForm>
       ) : (
         <p role="status" className="mt-4 rounded-lg bg-[#F7F8F7] p-4 text-sm leading-6 text-[#687873]">Add a product before recording a restock.</p>
       )}

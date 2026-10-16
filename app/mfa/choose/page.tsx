@@ -4,6 +4,8 @@ import { hasPasswordOnlySession, hasPermittedOnlineAuthentication } from '@/lib/
 import { redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
+import { ActionFeedback } from '@/app/components/action-feedback'
+import { EmailCodeSendButton } from './email-send-button'
 
 type PageProps = { searchParams: Promise<{ error?: string }> }
 
@@ -30,7 +32,7 @@ async function ChoiceContent({ searchParams }: PageProps) {
     ? 'No verified authenticator is set up for this account yet.'
     : error === 'email'
       ? 'This account needs a verified email address to receive a code.'
-      : error?.toLowerCase() === 'gateway timeout'
+      : error === 'gateway-timeout' || error?.toLowerCase() === 'gateway timeout'
         ? 'Supabase Auth timed out while sending the email. The code may not have been sent. Check the project Auth logs and SMTP provider before retrying.'
         : error
 
@@ -40,7 +42,7 @@ async function ChoiceContent({ searchParams }: PageProps) {
         <p className="text-sm font-semibold text-[#16835D]">SariPOS · Step 2 of 2</p>
         <h1 className="mt-5 text-2xl font-semibold tracking-[-0.04em]">Verify it’s you</h1>
         <p className="mt-2 text-sm leading-6 text-[#687873]">Your password is verified. Choose how to finish signing in.</p>
-        {errorMessage ? <p role="alert" className="mt-5 rounded-lg border border-[#F0D5D2] bg-[#FFF8F7] p-3 text-sm leading-6 text-[#8B322B]">{errorMessage}</p> : null}
+        <ActionFeedback message={errorMessage} error signal={errorMessage ? { errorMessage } : undefined} />
 
         <div className="mt-7 space-y-3">
           {hasTotp ? (
@@ -50,9 +52,7 @@ async function ChoiceContent({ searchParams }: PageProps) {
           ) : (
             <a href="/mfa/setup" className="flex min-h-12 items-center justify-center rounded-lg border border-[#DCE5E1] px-4 text-sm font-semibold text-[#46534C] hover:bg-[#F7F9F8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16835D]">Set up an authenticator app</a>
           )}
-          <form action={sendEmailSecondFactor}>
-            <button className="min-h-12 w-full rounded-lg border border-[#DCE5E1] px-4 text-sm font-semibold text-[#46534C] hover:bg-[#F7F9F8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16835D]">Send a code to my email</button>
-          </form>
+          <EmailCodeSendButton action={sendEmailSecondFactor} />
         </div>
         <p className="mt-5 text-xs leading-5 text-[#777D79]">Authenticator verification reaches AAL2. Email codes are a fallback sign-in method at AAL1.</p>
         <a href="/login" className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-[#087F5B] underline-offset-4 hover:underline">Back to sign in</a>

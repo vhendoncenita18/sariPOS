@@ -620,8 +620,11 @@ implementation and testing before they can be considered complete:
     access if that trade-off is not acceptable.
 -   The post-password email-code action uses Supabase Auth
     `signInWithOtp`; configure the hosted **Magic Link** template with
-    `{{ .Token }}` for a numeric code. Auth sends it through the project's
-    configured SMTP provider.
+    `{{ .Token }}` for a numeric code. If the template uses
+    `{{ .ConfirmationURL }}`, Supabase sends a magic link instead. Auth sends
+    the message through the project's configured SMTP provider. The app
+    verifies the entered code with `verifyOtp` using type `email`; no
+    callback route is used for this numeric-code flow.
 -   Blind-drop cash closing with a fully specified expected-cash
     formula.
 -   Automated tests for transaction atomicity, idempotency, and

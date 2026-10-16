@@ -112,16 +112,21 @@ async function requirePasswordSession() {
   return { supabase, user: userData.user }
 }
 
-export async function sendEmailSecondFactor(): Promise<never> {
+export async function sendEmailSecondFactor(): Promise<AuthState> {
   const { supabase, user } = await requirePasswordSession()
-  if (!user.email) redirect('/mfa/choose?error=email')
+  if (!user.email) return { error: 'This account needs a verified email address to receive a code.' }
 
-  // Supabase Auth sends this through the hosted Magic Link template; {{ .Token }} makes it a numeric OTP.
+  // The hosted Magic Link template must use {{ .Token }} to send a numeric OTP.
   const { error } = await supabase.auth.signInWithOtp({
     email: user.email,
     options: { shouldCreateUser: false },
   })
-  if (error) redirect(`/mfa/choose?error=${encodeURIComponent(error.message)}`)
+  if (error) {
+    const message = error.message.toLowerCase().includes('gateway timeout')
+      ? 'Supabase Auth timed out while sending the email. The code may not have been sent. Check Auth logs and SMTP settings before retrying.'
+      : error.message
+    return { error: message }
+  }
   redirect('/mfa/email')
 }
 
@@ -287,16 +292,16 @@ export async function verifyTotpEnrollment(_previousState: AuthState, formData: 
   return finishOnlineAuthentication(supabase)
 }
 
-export async function resendEmailSecondFactor(): Promise<never> {
+export async function resendEmailSecondFactor(): Promise<AuthState> {
   const { supabase, user } = await requirePasswordSession()
-  if (!user.email) redirect('/mfa/email?error=email')
+  if (!user.email) return { error: 'This account has no email address for verification.' }
 
   const { error } = await supabase.auth.signInWithOtp({
     email: user.email,
     options: { shouldCreateUser: false },
   })
-  if (error) redirect(`/mfa/email?error=${encodeURIComponent(error.message)}`)
-  redirect('/mfa/email?sent=1')
+  if (error) return { error: error.message }
+  return { message: `A new code was sent to ${user.email}.` }
 }
 
 export async function requestPasswordRecovery(_previousState: RecoveryState, formData: FormData): Promise<RecoveryState> {

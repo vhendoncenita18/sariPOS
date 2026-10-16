@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasPasswordOnlySession } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
+import { connection } from 'next/server'
 import { Suspense } from 'react'
 import { EmailCodeForm } from './email-form'
 
@@ -11,6 +12,8 @@ export default function EmailVerificationPage(props: PageProps) {
 }
 
 async function EmailContent({ searchParams }: PageProps) {
+  await connection()
+
   const supabase = await createClient()
   const [{ data: { user } }, { data: claims }] = await Promise.all([
     supabase.auth.getUser(),

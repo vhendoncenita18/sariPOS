@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { resendSignupCode, type AuthAction, type AuthState } from '@/app/actions/auth'
+import { ActionFeedback } from '@/app/components/action-feedback'
 
 export function AuthForm({
   action,
@@ -15,6 +16,11 @@ export function AuthForm({
   const [email, setEmail] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const isCodeStep = isSignUp && state.step === 'signup-verify'
+  const feedbackMessage = isCodeStep
+    ? resendState.error ?? resendState.message ?? state.error ?? state.message
+    : state.error ?? state.message
+  const feedbackError = isCodeStep ? Boolean(resendState.error ?? state.error) : Boolean(state.error)
+  const feedbackSignal = isCodeStep && (resendState.error || resendState.message) ? resendState : state
 
   return (
     <>
@@ -75,7 +81,13 @@ export function AuthForm({
                   aria-pressed={passwordVisible}
                   className="absolute inset-y-0 right-2 min-w-11 rounded-md px-2 text-xs font-medium text-[#53645C] hover:bg-[#F3F6F4] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#16835D]"
                 >
-                  {passwordVisible ? 'Hide' : 'Show'}
+                  <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="mx-auto size-5">
+                    {passwordVisible ? (
+                      <><path d="M3 3 17 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M8.6 8.6a2 2 0 0 0 2.8 2.8M7.1 5.5A9.7 9.7 0 0 1 10 5c4.2 0 7.3 3.1 8.3 5-.4.8-1.2 1.8-2.4 2.7M5.2 6.8C3.4 7.9 2.3 9.3 1.7 10c1 1.9 4.1 5 8.3 5 1 0 2-.2 2.8-.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></>
+                    ) : (
+                      <><path d="M1.7 10C2.7 8.1 5.8 5 10 5s7.3 3.1 8.3 5c-1 1.9-4.1 5-8.3 5S2.7 11.9 1.7 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><circle cx="10" cy="10" r="2.2" stroke="currentColor" strokeWidth="1.5" /></>
+                    )}
+                  </svg>
                 </button>
               </div>
             </div>
@@ -95,10 +107,6 @@ export function AuthForm({
             ) : null}
           </>
         )}
-
-        <div aria-live="polite" className={`min-h-10 text-sm leading-5 ${state.error ? 'text-[#B42318]' : 'text-[#087F5B]'}`}>
-          {state.error ?? state.message}
-        </div>
 
         <button
           type="submit"
@@ -131,11 +139,9 @@ export function AuthForm({
           >
             {isResending ? 'Sending…' : 'Resend confirmation code'}
           </button>
-          <p aria-live="polite" className={`min-h-6 pt-1 text-center text-xs ${resendState.error ? 'text-[#B42318]' : 'text-[#087F5B]'}`}>
-            {resendState.error ?? resendState.message}
-          </p>
         </form>
       ) : null}
+      <ActionFeedback message={feedbackMessage} error={feedbackError} signal={feedbackSignal} />
     </>
   )
 }
