@@ -31,9 +31,10 @@ RLS was previously confirmed enabled for these 13 public tables:
 | `stores` | Store/business records; parent scope for business data. Store creation should use the approved function. |
 | `profiles` | App profile for an authenticated user, keyed by `user_id` referencing the Auth user; `created_at` defaults to the current time and `display_name` is optional. The local migration `202610160002_create_profiles_on_signup.sql` creates rows from an `auth.users` trigger and backfills existing accounts. Deployment and trigger behavior must be verified in the target project. Users should only read their own profile unless a policy explicitly allows otherwise. |
 | `user_store_members` | Links users to stores and records membership/role. Store access must be based on this membership. Store creator is intended to become `owner`; verify the stored role and function body. |
-| `store_devices` | Registered selling devices. `sync_sale` checks `id`, `store_id`, `is_active`, and `revoked_at`. An active row alone is not cryptographic proof of physical-device identity. |
+| `store_devices` | Registered selling devices. Hosted columns/indexes/RLS were supplied by the user on 2026-10-16. `sync_sale` checks `id`, `store_id`, `is_active`, and `revoked_at`. An active row alone is not cryptographic proof of physical-device identity. Local migration `202610160011_register_store_device.sql` revokes direct writes and adds an owner-only registration RPC with audit; apply it to the hosted database before use. |
 | `products` | Store-scoped product catalog. Known fields include name, SKU/barcode, `selling_price >= 0`, optional `cost_price >= 0`, `is_active`, timestamps. Known unique `(store_id,id)` and per-store partial unique indexes for SKU/barcode. No stock column; stock is ledger-derived. |
 | `shifts` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `device_id`, `opened_at`, `opening_float`, `closed_at`, `counted_cash`, `expected_cash`, `variance`, `status`, and `created_at`. Status is `open` or `closed`; the check requires `closed_at` when closed. Composite store/device and store/id relationships are present. User-reported SELECT policy permits store members. Local migration `202610160006_close_and_reconcile_shifts.sql` adds `opened_by_user_id` and `closed_by_user_id`; deployment remains pending. |
+| `shifts` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `device_id`, `opened_at`, `opening_float`, `closed_at`, `counted_cash`, `expected_cash`, `variance`, and `status`. The user later reported `opened_by_user_id` and a scoped SELECT policy from migration 009. Hosted `open_store_shift` was inspected on 2026-10-16 and found not to set `opened_by_user_id`, causing cashier-opened shifts to be hidden by own-session RLS. Local migration `202610160012_record_shift_opener.sql` corrects the RPC; hosted deployment remains pending. |
 | `sales` | Sale header: ID, store, shift, status, subtotal, discount amount, grand total, occurred/received timestamps, required `payload_hash`. Known checks: nonnegative totals, `discount_amount <= subtotal`, `grand_total = subtotal - discount_amount`, completed status, store/shift relationship, unique `(store_id,id)`. |
 | `sale_items` | Item snapshots: store, sale, product, product-name snapshot, unit price, quantity, line discount, line total. Known checks: nonnegative price/discount, quantity positive, discount no greater than gross line value, `line_total = unit_price * quantity - line_discount`. |
 | `payments` | Hosted columns reported by the user on 2026-10-16: `id`, `store_id`, `sale_id`, `method`, `amount`, nullable `cash_tendered`, nullable `change_given`, nullable `reference`, `status`, `created_at`. Methods are `cash`, `gcash`, `maya`; status is `recorded`. For cash, `amount` is the net amount retained by the drawer; `cash_tendered - change_given = amount`. |
@@ -83,6 +84,20 @@ and actions. Cash movements, expenses, and shift closing are restricted to
 the shift opener or an owner, with actor identity checked in database
 triggers. The shift-breakdown RPC enforces the same own-shift rule. Apply it
 after migration 006 and verify hosted policies and grants before use.
+
+Migration `supabase/migrations/202610160010_enforce_sale_permission.sql`
+adds a trusted insert guard for `sales.create` and checks each new sale item's
+product name and unit price against the current active product row. This closes
+gaps in the user-supplied hosted `sync_sale` body, which verifies membership,
+shift/device, stock, totals, and idempotency but does not itself check the
+role permission or submitted price/name snapshots. Apply this migration before
+enabling cashier checkout.
+
+The user verified `authenticated` can execute the hosted
+`public.sync_sale(uuid, uuid, uuid, uuid, timestamptz, jsonb, jsonb, numeric,
+numeric, numeric)` via `has_function_privilege`. The supplied function body is
+the basis for the current server action's argument names and JSON item/payment
+shape; exact hosted definition and grants for other roles remain to verify.
 
 Supabase Auth owns `auth.users`. Do not insert directly into `auth.users`; use supported Supabase Auth flows.
 
@@ -205,7 +220,7 @@ Do not assume every operation below already has a function.
 | Operation | Required checks | Current status from known information |
 |---|---|---|
 | Create store | Authenticated caller; create store and owner membership atomically | Function exists; inspect body |
-| Register/revoke device | Owner/authorized role; store scope; revocation | Table exists; write path needs verification |
+| Register/revoke device | Owner, permitted online auth, derived store scope, audit; safe replacement | Local migration `202610160011_register_store_device.sql` adds first-device registration and read-only table grants. Hosted deployment pending; revocation/replacement is ticket 06. |
 | Create/edit/deactivate product | Owner and permitted-auth checks; valid price; SKU/barcode uniqueness; store scope; audit | Local migration `202610160005_manage_products.sql` adds owner-only edit and reversible active-status RPCs; hosted deployment remains pending |
 | Opening stock | Owner and permitted-auth checks; positive quantity; same-store product row lock; one-time initial movement; actor-attributed audit event | Local `record_opening_stock` migration added; hosted deployment and audit policy/constraint verification pending |
 | Restock/adjustment/damage | Validate quantity/reason; lock product; prevent negative stock; append ledger; audit | Write path not confirmed here |

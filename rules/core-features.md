@@ -75,7 +75,7 @@ Exact routes must follow the existing App Router and database schema. Checkout/P
 | Audit Log | Review protected, important actions | Recommended; access-controlled |
 | Expenses | Record/review shift expenses and payment method | Included in shift reconciliation |
 
-Each implemented workspace navigation item opens its own route and page. The current route map is **Dashboard** (`/pos`), **Sales** (`/pos/sales`), **Inventory** (`/pos/inventory`), **Products** (`/pos/products`), **My session** (`/pos/session`, cashier), and **Store settings** (`/pos/settings`, owner). Planned routes without verified implementations must not be shown as working navigation links. Auth and offline-unlock screens stay outside the workspace shell.
+Each implemented workspace navigation item opens its own route and page. The current route map is **Dashboard** (`/pos`), **New sale** (`/pos/sale`, owner/cashier with `sales.create`, `products.view`, and `inventory.view`), **Sales** (`/pos/sales`, owner), **Inventory** (`/pos/inventory`), **Products** (`/pos/products`), **My session** (`/pos/session`, cashier), and **Store settings** (`/pos/settings`, owner). The online checkout calls `sync_sale`; offline queue and sync recovery remain unimplemented. Planned routes without verified implementations must not be shown as working navigation links. Auth and offline-unlock screens stay outside the workspace shell.
 
 ## Dashboard Content
 
@@ -107,7 +107,7 @@ Do not test unfinished transaction logic against production sales.
 ## Core MVP Acceptance Criteria
 
 - The store creator receives the `owner` role in `user_store_members`; owner access remains subject to store scoping, RLS, grants, and trusted-operation checks. Cashiers cannot access owner-only cost/profit data.
-- Owners can create and edit products, deactivate/reactivate products without deleting history, record one initial opening-stock movement for a product with no stock history, restock products, open a shift on an active registered selling device, and assign a verified existing user a store role. These actions use trusted owner-only database operations. Apply the corresponding migrations before using the UI. Hosted `sync_sale` locks products and rejects inactive or cross-store products.
+- Owners can register the store's first active selling device from Store settings through a trusted owner-only RPC, then open a shift on it. Local migration `202610160011_register_store_device.sql` must be applied to Supabase before enrollment; device IDs associate shifts and sales but do not attest a physical browser. Owners can also create and edit products, deactivate/reactivate products without deleting history, record one initial opening-stock movement for a product with no stock history, restock products, and assign a verified existing user a store role. These actions use trusted owner-only database operations. Apply the corresponding migrations before using the UI. Hosted `sync_sale` locks products and rejects inactive or cross-store products.
 - Product and inventory workflows preserve non-negative stock.
 - Valid sale records correct item/overall discounts and totals; insufficient stock and invalid discounts fail.
 - A sale commit atomically produces one sale, its items, one payment, and matching inventory movements; retry produces no duplicate.

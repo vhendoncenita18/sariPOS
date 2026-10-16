@@ -148,10 +148,13 @@ before relying on them.
 
 ### Step 5 --- Register and authorize the selling device
 
-The application records the device as part of the store's
-authorized-device workflow. The server must validate authorization. A
-device ID by itself is not cryptographic proof of possession of the
-physical device.
+The owner registers the current counter from Store settings through the
+trusted `public.register_store_device` RPC. It derives the store from owner
+membership, requires permitted online authentication, writes an audit event,
+and allows one active device per store. Apply local migration
+`202610160011_register_store_device.sql` to the hosted database before use.
+The device ID associates shifts and sales; it does not prove possession of a
+physical browser. Revocation and replacement are handled separately.
 
 The MVP allows one active selling device per store.
 

@@ -6,6 +6,7 @@ import { SaleRegister, type SaleProduct } from '@/app/pos/sale/register'
 export default async function NewSalePage() {
   const { supabase, storeId, user, isOwner, permissions } = await getStoreContext()
   if (!isOwner && !permissions.includes('sales.create')) redirect('/pos')
+  if (!isOwner && (!permissions.includes('products.view') || !permissions.includes('inventory.view'))) redirect('/pos')
 
   const [productsResult, stockResult, shiftResult] = await Promise.all([
     supabase.from('products').select('id, name, sku, barcode, selling_price').eq('store_id', storeId).eq('is_active', true).order('name'),

@@ -8,7 +8,7 @@ export type ActionState = { message: string; error: boolean }
 function messageFor(error: { message?: string } | null, fallback: string) {
   const message = error?.message ?? ''
   if (message.includes('role_name_exists')) return 'A role with that name already exists.'
-  if (message.includes('shift_already_open')) return 'A shift is already open for this store.'
+  if (message.includes('shift_already_open')) return 'A shift is already open for this store. Reload My session; if it still appears closed, ask the owner to review it.'
   if (message.includes('shift_already_closed')) return 'This shift has already been closed.'
   if (message.includes('open_shift_required')) return 'This action requires an open shift.'
   if (message.includes('shift_session_owner_or_owner_required')) return 'Only the shift opener or store owner can record cash activity or close this shift.'
@@ -211,7 +211,10 @@ export async function openShift(_previous: ActionState, formData: FormData): Pro
   const openingFloat = Number(formData.get('openingFloat'))
   if (!deviceId || !Number.isFinite(openingFloat)) return { message: 'Choose a selling device and enter the opening float.', error: true }
   const { error } = await context.supabase.rpc('open_store_shift', { p_device_id: deviceId, p_opening_float: openingFloat })
-  if (error) return { message: messageFor(error, 'Shift could not be opened. Check the registered device and apply the owner operations migration.'), error: true }
+  if (error) {
+    if (error.message?.includes('shift_already_open')) revalidatePath('/pos/session')
+    return { message: messageFor(error, 'Shift could not be opened. Check the registered device and apply the owner operations migration.'), error: true }
+  }
   revalidatePath('/pos/session')
   revalidatePath('/pos')
   return { message: 'Shift opened.', error: false }

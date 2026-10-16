@@ -149,9 +149,9 @@ target database. The app does not directly write profile rows during signup.
                                 membership/role         `owner` role; verify the function body
                                                         and live row against the target project.
 
-  `public.store_devices`        Registered device for a Should be populated by a separate
-                                store                   authorized device-registration flow,
-                                                        not merely by signing up.
+  `public.store_devices`        Registered device for a Owner-only trusted registration RPC;
+                                store                   never direct browser writes. Local
+                                                        migration 011; hosted deployment pending.
   ---------------------------------------------------------------------------------------------
 
 **Do not create rows in all these tables directly from the browser.**
@@ -238,9 +238,9 @@ currently permitted.
   View own store             `stores`,                Read                 Only through an authorized membership
                              `user_store_members`                          relationship.
 
-  Register selling device    `store_devices`          Insert/update        Use a controlled device-authorization
-                                                                           operation; exact existing write policy
-                                                                           must be verified.
+  Register selling device    `store_devices`          Trusted RPC          Owner plus permitted online auth;
+                                                                           store scope is derived server-side.
+                                                                           Migration 011 must be applied.
 
   View products              `products`               Read                 Store membership must be enforced.
 
@@ -308,8 +308,10 @@ Migration `202610160003_record_opening_stock.sql` adds an owner-only opening
 stock operation that accepts one positive initial quantity for a product with
 no movement history and locks that product row. It must be applied to the
 hosted database before the Inventory form can save. Restock, adjustments,
-and damaged-stock writes, product editing, shift closing, and device enrollment
-remain separate work. The opening-stock RPC writes the actor and movement
+and damaged-stock writes and shift closing remain separate work. Migration
+`202610160011_register_store_device.sql` adds an owner-only first-device
+registration RPC and revokes direct client writes; apply it before use. The
+opening-stock RPC writes the actor and movement
 details to `store_audit_logs`. The reported audit policy permits member reads
 but no direct authenticated inserts, so verify the table is not forced under
 RLS for the security-definer function owner before relying on the hosted

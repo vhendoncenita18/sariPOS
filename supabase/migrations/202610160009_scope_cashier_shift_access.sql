@@ -131,7 +131,12 @@ create policy shift_cash_movements_read_member
 drop policy if exists audit_logs_read_member on public.store_audit_logs;
 create policy audit_logs_read_member
   on public.store_audit_logs for select to authenticated
-  using (private.is_store_owner(store_id) or actor_user_id = auth.uid());
+  using (
+    private.is_store_owner(store_id)
+    or (private.is_store_member(store_id)
+      and private.has_permitted_online_authentication()
+      and actor_user_id = auth.uid())
+  );
 
 create or replace function public.get_shift_cash_breakdown(p_shift_id uuid)
 returns jsonb

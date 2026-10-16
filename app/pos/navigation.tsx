@@ -48,14 +48,16 @@ function NavigationIcon({ name }: { name: NavigationItem['icon'] }) {
 export function PosNavigation({ isOwner, permissions, mobile = false }: { isOwner: boolean; permissions: string[]; mobile?: boolean }) {
   const pathname = usePathname()
   const permissionsForRoute: Record<string, string[]> = {
-    '/pos/sale': ['sales.create'],
+    '/pos/sale': ['sales.create', 'products.view', 'inventory.view'],
     '/pos/products': ['products.view'],
     '/pos/inventory': ['inventory.view'],
     '/pos/session': ['own_session.view', 'shift.open'],
   }
   const items = (isOwner ? ownerItems : cashierItems).filter((item) =>
     (!ownerOnlyRoutes.has(item.href) || isOwner) &&
-    (isOwner || !permissionsForRoute[item.href] || permissionsForRoute[item.href].some((permission) => permissions.includes(permission))),
+    (isOwner || !permissionsForRoute[item.href] || (item.href === '/pos/sale'
+      ? permissionsForRoute[item.href].every((permission) => permissions.includes(permission))
+      : permissionsForRoute[item.href].some((permission) => permissions.includes(permission)))),
   )
 
   return (

@@ -8,6 +8,8 @@ export type CheckoutState = {
   error: boolean
   saleId?: string
   retrySafe?: boolean
+  grandTotal?: string
+  paymentMethod?: string
 }
 
 type CartLine = { id: string; product_id: string; product_name_snapshot: string; unit_price: number; quantity: number; line_discount: number }
@@ -50,7 +52,7 @@ export async function processCheckout(_previous: CheckoutState, formData: FormDa
   if (!Number.isFinite(overallDiscount)) {
     return { ...initialState, message: 'Enter a valid sale discount.', error: true }
   }
-  if (submitted.some((line) => !uuidPattern.test(line.id) || !uuidPattern.test(line.product_id) || typeof line.product_name_snapshot !== 'string' || !line.product_name_snapshot.trim() || !Number.isFinite(cents(line.unit_price)) || !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 10000 || !Number.isFinite(cents(line.line_discount)))) {
+  if (submitted.some((line) => !line || typeof line !== 'object' || !uuidPattern.test(line.id) || !uuidPattern.test(line.product_id) || typeof line.product_name_snapshot !== 'string' || !line.product_name_snapshot.trim() || !Number.isFinite(cents(line.unit_price)) || !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 10000 || !Number.isFinite(cents(line.line_discount)))) {
     return { ...initialState, message: 'Check the item quantities and discounts.', error: true }
   }
 
@@ -63,16 +65,6 @@ export async function processCheckout(_previous: CheckoutState, formData: FormDa
     .maybeSingle()
   if (shiftError || !shift || shift.device_id !== deviceId || (!isOwner && shift.opened_by_user_id !== user.id)) {
     return { ...initialState, message: 'Your open shift is no longer available. Return to My session and check its status.', error: true }
-  }
-
-  const productIds = [...new Set(submitted.map((line) => line.product_id))]
-  const { data: products, error: productError } = await supabase
-    .from('products')
-    .select('id')
-    .eq('store_id', storeId)
-    .in('id', productIds)
-  if (productError || !products || products.length !== productIds.length) {
-    return { ...initialState, message: 'A cart item is no longer available. Refresh the catalog and review the sale.', error: true }
   }
 
   const items = []
@@ -121,7 +113,7 @@ export async function processCheckout(_previous: CheckoutState, formData: FormDa
     payment.change_given = money(tendered - amount)
   }
 
-  const { data, error } = await supabase.rpc('sync_sale', {
+  const { error } = await supabase.rpc('sync_sale', {
     p_store_id: storeId,
     p_sale_id: saleId,
     p_shift_id: shiftId,
@@ -135,10 +127,15 @@ export async function processCheckout(_previous: CheckoutState, formData: FormDa
   })
 
   if (error) {
+    const message = error.message?.includes('sale_create_permission_required')
+      ? 'Your assigned role does not allow creating sales.'
+      : error.message?.includes('sale_item_product_snapshot_mismatch')
+        ? 'A product price or name changed. Refresh the catalog and start a new sale.'
+        : error.code ? 'Sale was not recorded. Correct the details and try again.' : 'The result is unclear. Retry this same sale to safely confirm or finish it.'
     return {
       ...initialState,
       saleId,
-      message: error.code ? 'Sale was not recorded. Correct the details and try again.' : 'The result is unclear. Retry this same sale to safely confirm or finish it.',
+      message,
       error: true,
       retrySafe: Boolean(error.code),
     }
@@ -146,5 +143,5 @@ export async function processCheckout(_previous: CheckoutState, formData: FormDa
 
   revalidatePath('/pos')
   revalidatePath('/pos/sales')
-  return { message: 'Sale recorded.', error: false, saleId }
+  return { message: 'Sale recorded.', error: false, saleId, grandTotal: money(grandTotal), paymentMethod: method }
 }

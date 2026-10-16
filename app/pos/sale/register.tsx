@@ -1,10 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
+import { useActionState, useMemo, useState } from 'react'
 import { processCheckout, type CheckoutState } from '@/app/actions/checkout'
 
 export type SaleProduct = { id: string; name: string; sku: string | null; barcode: string | null; price: number; stock: number }
-type CartLine = { id: string; product_id: string; quantity: number; line_discount: number }
+type CartLine = { id: string; product_id: string; product_name_snapshot: string; unit_price: number; quantity: number; line_discount: number }
 type SaleAttempt = { saleId: string; paymentId: string; occurredAt: string }
 const initialState: CheckoutState = { message: '', error: false }
 const money = (value: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(value)
@@ -18,25 +18,18 @@ export function SaleRegister({ products, shiftId, deviceId }: { products: SalePr
   const [method, setMethod] = useState<'cash' | 'gcash' | 'maya'>('cash')
   const [tendered, setTendered] = useState('')
   const [reference, setReference] = useState('')
+  const [showMobileCart, setShowMobileCart] = useState(false)
   const lockedForRetry = Boolean(state.error && state.saleId && attempt?.saleId === state.saleId && !state.retrySafe)
-
-  useEffect(() => {
-    if (!state.error && state.saleId && attempt?.saleId === state.saleId) {
-      setCart([])
-      setAttempt(null)
-      setDiscount('0')
-      setTendered('')
-      setReference('')
-    }
-  }, [attempt?.saleId, state.error, state.saleId])
+  const saleComplete = Boolean(!state.error && state.saleId && attempt?.saleId === state.saleId)
+  const visibleCart = saleComplete ? [] : cart
 
   const filtered = useMemo(() => {
     const value = search.trim().toLocaleLowerCase()
     return products.filter((product) => !value || [product.name, product.sku, product.barcode].some((field) => field?.toLocaleLowerCase().includes(value)))
   }, [products, search])
   const detailById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
-  const subtotal = cart.reduce((sum, line) => sum + (detailById.get(line.product_id)?.price ?? 0) * line.quantity, 0)
-  const itemDiscount = cart.reduce((sum, line) => sum + line.line_discount, 0)
+  const subtotal = visibleCart.reduce((sum, line) => sum + (detailById.get(line.product_id)?.price ?? 0) * line.quantity, 0)
+  const itemDiscount = visibleCart.reduce((sum, line) => sum + line.line_discount, 0)
   const totalDiscount = itemDiscount + (Number(discount) || 0)
   const total = Math.max(0, subtotal - totalDiscount)
   const change = Math.max(0, (Number(tendered) || 0) - total)
@@ -44,12 +37,18 @@ export function SaleRegister({ products, shiftId, deviceId }: { products: SalePr
 
   function addProduct(product: SaleProduct) {
     if (cartLocked || product.stock <= 0) return
-    if (!attempt) setAttempt({ saleId: crypto.randomUUID(), paymentId: crypto.randomUUID(), occurredAt: new Date().toISOString() })
+    if (!attempt || saleComplete) {
+      setAttempt({ saleId: crypto.randomUUID(), paymentId: crypto.randomUUID(), occurredAt: new Date().toISOString() })
+      setDiscount('0')
+      setTendered('')
+      setReference('')
+    }
     setCart((current) => {
-      const existing = current.find((line) => line.product_id === product.id)
+      const base = saleComplete ? [] : current
+      const existing = base.find((line) => line.product_id === product.id)
       return existing
-        ? current.map((line) => line.product_id === product.id ? { ...line, quantity: Math.min(product.stock, line.quantity + 1) } : line)
-        : [...current, { id: crypto.randomUUID(), product_id: product.id, quantity: 1, line_discount: 0 }]
+        ? base.map((line) => line.product_id === product.id ? { ...line, quantity: Math.min(product.stock, line.quantity + 1) } : line)
+        : [...base, { id: crypto.randomUUID(), product_id: product.id, product_name_snapshot: product.name, unit_price: product.price, quantity: 1, line_discount: 0 }]
     })
   }
 
@@ -63,10 +62,12 @@ export function SaleRegister({ products, shiftId, deviceId }: { products: SalePr
   }
 
   return (
+    <>
+    {saleComplete ? <section className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#B9DDC9] bg-[#E8F4EE] p-5 print:border-0 print:bg-white"><div><p className="font-semibold text-[#176B4C]">Receipt · sale {state.saleId!.slice(0, 8)}</p><p className="mt-1 text-sm text-[#416B58]">{state.paymentMethod?.toUpperCase()} · {money(Number(state.grandTotal ?? 0))} · recorded successfully</p></div><button type="button" onClick={() => window.print()} className="min-h-11 cursor-pointer rounded-lg border border-[#A9CEB8] px-4 text-sm font-semibold text-[#176B4C] hover:bg-white">Print receipt</button></section> : null}
     <form action={action} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,430px)]">
       <input type="hidden" name="shiftId" value={shiftId} /><input type="hidden" name="deviceId" value={deviceId} />
       <input type="hidden" name="saleId" value={attempt?.saleId ?? ''} /><input type="hidden" name="paymentId" value={attempt?.paymentId ?? ''} /><input type="hidden" name="occurredAt" value={attempt?.occurredAt ?? ''} />
-      <input type="hidden" name="items" value={JSON.stringify(cart)} />
+      <input type="hidden" name="items" value={JSON.stringify(visibleCart)} />
 
       <section className="min-w-0">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -84,18 +85,18 @@ export function SaleRegister({ products, shiftId, deviceId }: { products: SalePr
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-[#E2E8E4] bg-white xl:sticky xl:top-[88px]">
-        <header className="flex items-center justify-between border-b border-[#EEF1EF] px-5 py-4"><div><h2 className="font-semibold">Current sale</h2><p className="mt-1 text-xs text-[#687873]">{cart.length} {cart.length === 1 ? 'product' : 'products'}</p></div>{cart.length ? <button type="button" disabled={cartLocked} onClick={() => { setCart([]); setAttempt(null); setDiscount('0'); setTendered('') }} className="min-h-10 cursor-pointer px-2 text-sm font-medium text-[#687873] hover:text-[#9B3028] disabled:cursor-not-allowed">Clear sale</button> : null}</header>
+      <section className={`overflow-y-auto rounded-xl border border-[#E2E8E4] bg-white shadow-[0_12px_36px_rgba(20,45,34,0.12)] xl:sticky xl:inset-auto xl:top-[88px] xl:bottom-auto xl:z-auto xl:block xl:max-h-[calc(100vh-108px)] xl:overflow-hidden xl:shadow-none ${showMobileCart ? 'fixed inset-x-3 bottom-20 z-30 max-h-[72vh]' : 'hidden xl:block'}`}>
+        <header className="flex items-center justify-between border-b border-[#EEF1EF] px-5 py-4"><div><h2 className="font-semibold">Current sale</h2><p className="mt-1 text-xs text-[#687873]">{visibleCart.length} {visibleCart.length === 1 ? 'product' : 'products'}</p></div>{visibleCart.length ? <button type="button" disabled={cartLocked} onClick={() => { setCart([]); setAttempt(null); setDiscount('0'); setTendered('') }} className="min-h-10 cursor-pointer px-2 text-sm font-medium text-[#687873] hover:text-[#9B3028] disabled:cursor-not-allowed">Clear sale</button> : null}</header>
 
         <div className="max-h-[38vh] min-h-24 divide-y divide-[#EEF1EF] overflow-y-auto px-5">
-          {cart.map((line) => {
+          {visibleCart.map((line) => {
             const product = detailById.get(line.product_id)
             if (!product) return null
             return <div key={line.id} className="py-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{product.name}</p><p className="mt-1 text-xs tabular-nums text-[#687873]">{money(product.price)} each</p></div><button type="button" aria-label={`Remove ${product.name}`} disabled={cartLocked} onClick={() => removeProduct(line.product_id)} className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-lg text-[#687873] hover:bg-[#F7F8F7] hover:text-[#9B3028] disabled:cursor-not-allowed">×</button></div>
               <div className="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-3"><label className="text-xs text-[#687873]">Quantity<input aria-label={`${product.name} quantity`} type="number" min="1" max={product.stock} step="1" value={line.quantity} disabled={cartLocked} onChange={(event) => updateLine(line.product_id, { quantity: Math.min(product.stock, Math.max(1, Number(event.target.value) || 1)) })} className="mt-1 min-h-11 w-full rounded-lg border border-[#DCE5E1] px-3 text-sm text-[#171918] outline-none focus:border-[#16835D] disabled:bg-[#F3F6F4]" /></label><label className="text-xs text-[#687873]">Item discount<input aria-label={`${product.name} discount`} type="number" min="0" max={product.price * line.quantity} step="0.01" value={line.line_discount} disabled={cartLocked} onChange={(event) => updateLine(line.product_id, { line_discount: Math.max(0, Number(event.target.value) || 0) })} className="mt-1 min-h-11 w-full rounded-lg border border-[#DCE5E1] px-3 text-sm text-[#171918] outline-none focus:border-[#16835D] disabled:bg-[#F3F6F4]" /></label><p className="pb-3 text-sm font-semibold tabular-nums">{money(product.price * line.quantity - line.line_discount)}</p></div>
             </div>
           })}
-          {!cart.length ? <div className="grid min-h-28 place-items-center text-sm text-[#89928D]">Add an item to start the sale</div> : null}
+          {!visibleCart.length ? <div className="grid min-h-28 place-items-center text-sm text-[#89928D]">Add an item to start the sale</div> : null}
         </div>
 
         <div className="space-y-3 border-t border-[#EEF1EF] px-5 py-4">
@@ -108,10 +109,17 @@ export function SaleRegister({ products, shiftId, deviceId }: { products: SalePr
 
           {state.message ? <p role={state.error ? 'alert' : 'status'} className={`rounded-lg px-3 py-2.5 text-sm leading-5 ${state.error ? 'bg-[#FFF3F1] text-[#8B322B]' : 'bg-[#E8F4EE] text-[#176B4C]'}`}>{state.message}</p> : null}
           {lockedForRetry ? <p className="text-xs leading-5 text-[#687873]">The first request may have completed. Retry without changing this basket; the sale ID prevents a duplicate.</p> : null}
-          <button type="submit" disabled={pending || !cart.length || total < 0 || (method === 'cash' && (Number(tendered) || 0) < total)} className="min-h-[52px] w-full cursor-pointer rounded-lg bg-[#087F5B] px-4 text-base font-semibold text-white hover:bg-[#076A4D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F5B] disabled:cursor-not-allowed disabled:bg-[#A9BCB3]">{pending ? 'Recording sale…' : lockedForRetry ? 'Retry same sale' : 'Complete sale'}</button>
+          <button type="submit" disabled={pending || !visibleCart.length || total < 0 || (method === 'cash' && (Number(tendered) || 0) < total)} className="min-h-[52px] w-full cursor-pointer rounded-lg bg-[#087F5B] px-4 text-base font-semibold text-white hover:bg-[#076A4D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F5B] disabled:cursor-not-allowed disabled:bg-[#A9BCB3]">{pending ? 'Recording sale…' : lockedForRetry ? 'Retry same sale' : 'Complete sale'}</button>
           <p className="text-center text-xs leading-5 text-[#89928D]">Checkout is online-only. Server checks current prices, stock, shift, device, and cashier access.</p>
         </div>
       </section>
     </form>
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[#DCE5E1] bg-white/95 p-3 shadow-[0_-8px_24px_rgba(20,45,34,0.08)] backdrop-blur-sm xl:hidden">
+      <button type="button" aria-expanded={showMobileCart} onClick={() => setShowMobileCart((open) => !open)} className="flex min-h-12 w-full cursor-pointer items-center justify-between rounded-lg bg-[#171918] px-4 text-left text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16835D]">
+        <span><span className="block text-sm font-semibold">{showMobileCart ? 'Back to products' : `Review basket · ${visibleCart.length}`}</span><span className="mt-0.5 block text-xs text-white/70">{showMobileCart ? 'Continue adding items' : 'Payment and checkout'}</span></span>
+        <span className="text-base font-semibold tabular-nums">{money(total)}</span>
+      </button>
+    </div>
+    </>
   )
 }
